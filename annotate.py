@@ -38,12 +38,16 @@ def parse_args() -> argparse.Namespace:
     ingest.add_argument("--min-width", type=int, default=640)
     ingest.add_argument("--min-height", type=int, default=480)
 
-    review = subparsers.add_parser("review", help="打开 LabelImg，并在关闭后同步 YOLO 标签")
+    review = subparsers.add_parser("review", help="打开内置稳定标注器")
     review.add_argument("--workspace", default="annotations/road_mark_missing")
+    review.add_argument("--start", type=int, default=0)
 
-    native_review = subparsers.add_parser("review-native", help="打开原生轻量标注工具作为备用")
+    native_review = subparsers.add_parser("review-native", help="review 的兼容别名")
     native_review.add_argument("--workspace", default="annotations/road_mark_missing")
     native_review.add_argument("--start", type=int, default=0)
+
+    labelimg_review = subparsers.add_parser("review-labelimg", help="打开可选的 LabelImg 标注器")
+    labelimg_review.add_argument("--workspace", default="annotations/road_mark_missing")
 
     sync = subparsers.add_parser("labelimg-sync", help="同步 LabelImg 标签到标注清单")
     sync.add_argument("--workspace", default="annotations/road_mark_missing")
@@ -87,10 +91,12 @@ def main() -> None:
         print(f"候选清单: {result.manifest}")
         print(f"候选图片: {result.candidates}，高标线得分: {result.high_score_candidates}，随机负样本池: {result.random_candidates}")
     elif args.command == "review":
-        result = run_labelimg(args.workspace)
-        print(f"LabelImg 同步完成: positive={result.positive}, negative={result.negative}, pending={result.pending}, updated={result.updated}")
+        AnnotationSession(args.workspace, start=args.start).run()
     elif args.command == "review-native":
         AnnotationSession(args.workspace, start=args.start).run()
+    elif args.command == "review-labelimg":
+        result = run_labelimg(args.workspace)
+        print(f"LabelImg 同步完成: positive={result.positive}, negative={result.negative}, pending={result.pending}, updated={result.updated}")
     elif args.command == "labelimg-sync":
         result = sync_labelimg_annotations(args.workspace, args.accept_unlabeled_negative)
         print(f"LabelImg 同步完成: positive={result.positive}, negative={result.negative}, pending={result.pending}, updated={result.updated}")

@@ -59,19 +59,21 @@ python annotate.py status
 - 无目标图片按 `N` 确认为负样本，不能直接跳过。
 - 模糊到无法确定是否缺失的图片不应作为正样本。
 
-使用 LabelImg 人工标注：
+使用内置稳定标注器人工标注：
 
 ```bash
 python annotate.py review
 ```
 
-在 LabelImg 中按 `W` 画框、`Ctrl+S` 保存、`A/D` 切换。关闭窗口后会自动同步已保存的 YOLO 标签。只有在全部剩余图片都逐张检查完毕后，才执行：
+使用鼠标左键画框、`S` 保存正样本、`N` 确认负样本、`A/D` 切换。程序会直接保存 YOLO 标签和复核状态。
+
+LabelImg 仅作为可选兼容工具：
 
 ```bash
-python annotate.py labelimg-sync --accept-unlabeled-negative
+python annotate.py review-labelimg
 ```
 
-LabelImg 无法使用时可运行 `python annotate.py review-native` 启动备用工具。
+只有在 LabelImg 中逐张检查全部剩余图片后，才运行 `python annotate.py labelimg-sync --accept-unlabeled-negative`。
 
 有第一版单类模型后，先生成预标注再人工复核：
 

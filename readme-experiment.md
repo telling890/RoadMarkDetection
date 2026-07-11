@@ -65,11 +65,10 @@ class 0: road_mark_missing
 ```bash
 python annotate.py select --source dataset/images --workspace annotations/road_mark_missing --max-images 800 --scan-limit 6000
 python annotate.py review --workspace annotations/road_mark_missing
-python annotate.py labelimg-sync --workspace annotations/road_mark_missing --accept-unlabeled-negative
 python annotate.py export --workspace annotations/road_mark_missing --output "new data1" --data data/road_mark_missing.yaml --train-ratio 0.8 --force
 ```
 
-`review` 会启动 LabelImg 并使用 YOLO 单类格式。只有在全部图片已逐张检查后，才能运行带 `--accept-unlabeled-negative` 的同步命令。
+`review` 会启动内置稳定标注器并直接保存 YOLO 单类标签。LabelImg 可通过 `python annotate.py review-labelimg` 启动，仅作为兼容入口。
 
 `new data1/` 只接收状态为 `positive` 或 `negative` 的人工复核样本。原 `dataset/` 的道路病害标签不得复制到新数据集。
 

@@ -99,7 +99,7 @@ GPU: NVIDIA GeForce RTX 5070 Laptop GPU
 python annotate.py select --source dataset/images --workspace annotations/road_mark_missing --max-images 800 --scan-limit 6000
 ```
 
-#### 使用 LabelImg 打开标注程序
+#### 打开内置稳定标注程序
 
 在 Windows PowerShell 中进入项目并激活环境：
 
@@ -115,28 +115,32 @@ python annotate.py review --workspace annotations\road_mark_missing
 D:\conda\envs\py320\python.exe annotate.py review --workspace annotations\road_mark_missing
 ```
 
-该命令会自动准备候选图片、启动 LabelImg，并设置为 YOLO、单类别和自动保存模式。类别固定为 `road_mark_missing`。
+该命令启动项目内置的单类标注器。它直接读写标注清单，支持正样本、负样本、AI 预标注修正、断点续标和原子保存，不依赖 LabelImg 的全局设置。类别固定为 `road_mark_missing`。
 
-LabelImg 常用操作：
+常用操作：
 
 | 操作 | 按键或鼠标 |
 |---|---|
-| 新建标注框 | `W`，然后鼠标左键拖动 |
-| 保存当前标签 | `Ctrl+S` |
-| 删除选中的框 | `Delete` |
+| 新建标注框 | 鼠标左键拖动 |
+| 保存正样本并进入下一张 | `S` |
+| 确认为负样本并进入下一张 | `N` |
+| 撤销最后一个框 | `Z` |
 | 上一张 / 下一张 | `A` / `D` |
-| 放大 / 缩小 | `Ctrl++` / `Ctrl+-` |
-| 关闭程序 | 关闭 LabelImg 窗口 |
+| 退出并保存已确认进度 | `Q` 或 `Esc` |
 
-关闭 LabelImg 后，程序会自动把新增或修改过的 YOLO `.txt` 同步回标注清单。没有框的图片不会自动判为负样本，以免把尚未查看的图片误标为负样本。
+按 `S` 时必须至少有一个框；无缺失目标的图片直接按 `N`，不会把尚未查看的图片误标为负样本。程序重新打开后会自动定位到第一张未确认图片。
 
-确认已经逐张查看全部剩余图片后，才能执行：
+LabelImg 仍作为可选兼容工具保留：
+
+```powershell
+python annotate.py review-labelimg --workspace annotations\road_mark_missing
+```
+
+关闭 LabelImg 后会同步新增或修改过的 YOLO 标签。只有确认 LabelImg 中所有剩余图片均已逐张检查时，才能执行：
 
 ```powershell
 python annotate.py labelimg-sync --workspace annotations\road_mark_missing --accept-unlabeled-negative
 ```
-
-该命令会把仍然没有标签文件的图片确认为负样本。若还没有检查完全部图片，不要使用 `--accept-unlabeled-negative`。
 
 查看标注进度：
 
@@ -144,13 +148,7 @@ python annotate.py labelimg-sync --workspace annotations\road_mark_missing --acc
 python annotate.py status --workspace annotations\road_mark_missing
 ```
 
-标注记录保存在 `annotations/road_mark_missing/`。LabelImg 无法启动时，可使用备用工具：
-
-```powershell
-python annotate.py review-native --workspace annotations\road_mark_missing
-```
-
-备用工具中使用鼠标左键框选，`S` 保存正样本，`N` 确认负样本，`Z` 撤销，`A/D` 切换图片，`Q` 退出。
+标注记录保存在 `annotations/road_mark_missing/`。`review-native` 是内置标注器的兼容别名。
 
 完成复核后导出到用户指定的 `new data1/`：
 
@@ -283,11 +281,7 @@ python annotate.py status
 python annotate.py review --workspace annotations\road_mark_missing
 ```
 
-在 LabelImg 中按 `W` 后拖动框选，按 `Ctrl+S` 保存，使用 `A/D` 切换图片。关闭 LabelImg 后会自动同步已保存标签。确认所有剩余无框图片均已人工查看后，再将其标记为负样本：
-
-```powershell
-python annotate.py labelimg-sync --workspace annotations\road_mark_missing --accept-unlabeled-negative
-```
+在内置标注器中使用鼠标左键拖动框选，按 `S` 保存正样本，按 `N` 确认负样本，使用 `A/D` 切换图片。
 
 查看进度：
 
