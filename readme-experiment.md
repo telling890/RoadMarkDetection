@@ -54,6 +54,24 @@ GPU: NVIDIA GeForce RTX 5070 Laptop GPU
 
 ## 2. 数据准备
 
+正式实验数据必须来自人工复核后的单类标注集：
+
+```text
+class 0: road_mark_missing
+```
+
+候选筛选、人工框选和导出命令：
+
+```bash
+python annotate.py select --source dataset/images --workspace annotations/road_mark_missing --max-images 800 --scan-limit 6000
+python annotate.py review --workspace annotations/road_mark_missing
+python annotate.py export --workspace annotations/road_mark_missing --output "new data1" --data data/road_mark_missing.yaml --train-ratio 0.8 --force
+```
+
+`new data1/` 只接收状态为 `positive` 或 `negative` 的人工复核样本。原 `dataset/` 的道路病害标签不得复制到新数据集。
+
+最低启动门槛为 300 张正样本、100 张负样本；未达到该门槛时只能做训练链路测试。标注规则、快捷键和完整说明见主 README 的“人工标注新的单类数据集”。
+
 数据配置：
 
 ```text

@@ -15,6 +15,9 @@ Thumbs.db
 
 # Local datasets and generated artifacts
 dataset/
+dataset_roadmark_missing/
+new data1/
+annotations/
 runs/
 *.cache
 *.zip

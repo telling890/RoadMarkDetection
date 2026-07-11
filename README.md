@@ -85,6 +85,98 @@ GPU: NVIDIA GeForce RTX 5070 Laptop GPU
 
 ## 4. 数据准备
 
+### 4.1 当前数据复核结论
+
+当前 `dataset/` 在文件格式上可训练，但其 `D00-D90` 框主要是裂缝、龟裂、坑槽和修补区域，不是路面标线缺失真值。该目录只能用于代码链路测试，不能用于正式路面标线缺失实验。
+
+### 4.2 人工标注新的单类数据集
+
+正式任务采用单类 `road_mark_missing`。标注框只覆盖能够从上下文确认的缺失、断裂或严重磨损标线区段；不要框裂缝、坑槽、阴影、车辆遮挡、完整标线或本来没有标线的路面。
+
+首批 800 张候选清单位于 `annotations/road_mark_missing/manifest.csv`。重新筛选候选：
+
+```bash
+python annotate.py select --source dataset/images --workspace annotations/road_mark_missing --max-images 800 --scan-limit 6000
+```
+
+#### 打开标注程序
+
+在 Windows PowerShell 中进入项目并激活环境：
+
+```powershell
+conda activate py320
+cd C:\Users\lenovo\Desktop\RoadMarkDetection
+python annotate.py review --workspace annotations\road_mark_missing
+```
+
+如果 `python` 没有使用 `py320` 环境，直接指定解释器：
+
+```powershell
+D:\conda\envs\py320\python.exe annotate.py review --workspace annotations\road_mark_missing
+```
+
+标注窗口会从第一张未确认图片开始。操作键：
+
+| 操作 | 按键或鼠标 |
+|---|---|
+| 框选路面标线缺失区域 | 鼠标左键拖动 |
+| 保存正样本并进入下一张 | `S` |
+| 确认为无缺失目标的负样本 | `N` |
+| 撤销最后一个框 | `Z` |
+| 上一张 / 下一张 | `A` / `D` |
+| 退出并保留当前进度 | `Q` 或 `Esc` |
+
+查看标注进度：
+
+```powershell
+python annotate.py status --workspace annotations\road_mark_missing
+```
+
+正样本必须至少画一个框才能按 `S` 保存。无缺失目标的图片应按 `N` 确认为负样本，不能直接跳过。标注记录保存在 `annotations/road_mark_missing/`，重新打开程序会继续处理未确认图片。
+
+完成复核后导出到用户指定的 `new data1/`：
+
+```bash
+python annotate.py export --workspace annotations/road_mark_missing --output "new data1" --data data/road_mark_missing.yaml --train-ratio 0.8 --force
+```
+
+导出结果：
+
+```text
+new data1/
+├── images/train
+├── images/val
+├── labels/train
+└── labels/val
+```
+
+建议正式训练前至少完成 300 张正样本和 100 张负样本；论文实验建议达到 1000 张以上正样本，并由第二人抽检不少于 10%。
+
+后续自采图片可持续追加，不会覆盖已有标注：
+
+```bash
+python annotate.py ingest --source incoming_data/session01 --batch session01 --scene urban --weather sunny --time-of-day day
+python annotate.py status
+```
+
+训练出第一版单类模型后，可用它生成预标注，再逐图确认：
+
+```bash
+python annotate.py prelabel --weights runs/train/exp_baseline_ciou/weights/best.pt --device 0
+python annotate.py review
+```
+
+完整的拍摄配额、目录命名、质量门槛和增量流程见 [DATA_COLLECTION.md](DATA_COLLECTION.md)。导出会按采集会话分组划分 train/val，避免相邻视频帧跨集合导致指标虚高。
+
+新数据审计和训练：
+
+```bash
+python experiment.py --exp EXP-00 --data data/road_mark_missing.yaml --outputs runs/roadmark_missing_audit
+python experiment.py --exp EXP-01 --data data/road_mark_missing.yaml --device 0 --profile accuracy
+```
+
+### 4.3 原始道路病害数据重新导入
+
 原始数据放在 `data/` 目录。工程支持 Roboflow YOLO txt zip 数据包，能自动处理 `labels` 和 `labelTxt` 两种标签目录。
 
 重新生成训练集和验证集：

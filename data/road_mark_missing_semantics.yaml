@@ -1,0 +1,8 @@
+target_task: road_mark_missing_detection
+source_task: pending_manual_review
+verified_for_target_task: false
+annotation_method: manual_bbox_review
+message: >-
+  Export reviewed positive and negative images with annotate.py before training.
+classes:
+  - road_mark_missing

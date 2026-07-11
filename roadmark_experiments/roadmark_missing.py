@@ -40,8 +40,12 @@ def missing_class_name(source_name: str) -> str:
 
 def load_semantic_metadata(data_yaml: str | Path) -> dict:
     data_yaml = Path(data_yaml).resolve()
-    metadata_path = data_yaml.with_name("label_semantics.yaml")
-    if not metadata_path.exists():
+    candidates = [
+        data_yaml.with_name(f"{data_yaml.stem}_semantics.yaml"),
+        data_yaml.with_name("label_semantics.yaml"),
+    ]
+    metadata_path = next((path for path in candidates if path.exists()), None)
+    if metadata_path is None:
         return {}
     return yaml.safe_load(metadata_path.read_text(encoding="utf-8")) or {}
 
