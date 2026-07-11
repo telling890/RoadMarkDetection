@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import argparse
 import sys
 import time
 from pathlib import Path
@@ -86,13 +87,14 @@ class ImagePane(QLabel):
 class RoadMarkDemo(QMainWindow):
     """路面标线缺失检测 GUI 主窗口。"""
 
-    def __init__(self) -> None:
+    def __init__(self, weights: str | Path | None = None) -> None:
         super().__init__()
         self.setWindowTitle("RoadMarkMissingDetection - YOLO26")
         self.resize(1280, 760)
 
         register_custom_modules()
         self.device = select_device()
+        self.default_weights = Path(weights).resolve() if weights else DEFAULT_WEIGHTS
         self.model = self._load_default_model()
         self.cap: cv2.VideoCapture | None = None
         self.timer = QTimer(self)
@@ -146,9 +148,11 @@ class RoadMarkDemo(QMainWindow):
         toolbar.addAction(action)
 
     def _load_default_model(self) -> YOLO:
-        if DEFAULT_WEIGHTS.exists():
-            self.current_model_name = str(DEFAULT_WEIGHTS)
-            return YOLO(str(DEFAULT_WEIGHTS))
+        if self.default_weights.exists():
+            self.current_model_name = str(self.default_weights)
+            return YOLO(str(self.default_weights))
+        if self.default_weights != DEFAULT_WEIGHTS:
+            raise FileNotFoundError(f"未找到指定模型权重: {self.default_weights}")
         self.current_model_name = "yolo26n.pt"
         return YOLO("yolo26n.pt")
 
@@ -241,8 +245,11 @@ class RoadMarkDemo(QMainWindow):
 
 
 def main() -> None:
-    app = QApplication(sys.argv)
-    window = RoadMarkDemo()
+    parser = argparse.ArgumentParser(description="路面标线缺失检测 PyQt5 Demo")
+    parser.add_argument("--weights", default=None, help="启动时加载的模型权重")
+    args, qt_args = parser.parse_known_args()
+    app = QApplication([sys.argv[0], *qt_args])
+    window = RoadMarkDemo(args.weights)
     window.show()
     sys.exit(app.exec_())
 

@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import json
 import math
 import os
 import random
 import re
 import shutil
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,6 +68,22 @@ class IngestResult:
     imported_images: int
     duplicate_images: int
     rejected_images: int
+
+
+@dataclass(frozen=True)
+class LabelImgWorkspaceResult:
+    image_dir: Path
+    label_dir: Path
+    class_file: Path
+    images: int
+
+
+@dataclass(frozen=True)
+class LabelImgSyncResult:
+    positive: int
+    negative: int
+    pending: int
+    updated: int
 
 
 def logical_source_name(path: Path) -> str:
@@ -211,6 +230,138 @@ def select_annotation_candidates(
     (workspace / "labels").mkdir(exist_ok=True)
     _write_manifest(manifest, rows)
     return SelectionResult(manifest, len(rows), high_count, len(random_rows))
+
+
+def _label_state(path: Path) -> dict[str, int | str] | None:
+    if not path.exists():
+        return None
+    return {"mtime_ns": path.stat().st_mtime_ns, "sha256": _sha256(path)}
+
+
+def prepare_labelimg_workspace(workspace: str | Path) -> LabelImgWorkspaceResult:
+    workspace = Path(workspace).resolve()
+    rows = _read_manifest(workspace / "manifest.csv")
+    if not rows:
+        raise RuntimeError(f"标注清单为空，请先执行 select 或 ingest: {workspace / 'manifest.csv'}")
+
+    labelimg_root = workspace / "labelimg"
+    image_dir = labelimg_root / "images"
+    label_dir = labelimg_root / "labels"
+    image_dir.mkdir(parents=True, exist_ok=True)
+    label_dir.mkdir(parents=True, exist_ok=True)
+    class_file = labelimg_root / "predefined_classes.txt"
+    class_file.write_text("road_mark_missing\n", encoding="utf-8")
+    (label_dir / "classes.txt").write_text("road_mark_missing\n", encoding="utf-8")
+
+    baseline: dict[str, dict[str, int | str] | None] = {}
+    prepared = 0
+    for row in rows:
+        source = Path(row["source_image"])
+        if not source.exists():
+            row["notes"] = ";".join(filter(None, (row.get("notes", ""), "missing_source_image")))
+            continue
+        image_target = image_dir / f"{row['candidate_id']}{source.suffix.lower()}"
+        if not image_target.exists():
+            try:
+                os.link(source, image_target)
+            except OSError:
+                shutil.copy2(source, image_target)
+
+        source_label = workspace / "labels" / f"{row['candidate_id']}.txt"
+        label_target = label_dir / f"{row['candidate_id']}.txt"
+        if source_label.exists() and (not label_target.exists() or row.get("status") == "prelabel"):
+            shutil.copy2(source_label, label_target)
+        baseline[row["candidate_id"]] = _label_state(label_target)
+        prepared += 1
+
+    _write_manifest(workspace / "manifest.csv", rows)
+    (labelimg_root / "baseline.json").write_text(
+        json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return LabelImgWorkspaceResult(image_dir, label_dir, class_file, prepared)
+
+
+def _validate_labelimg_yolo(path: Path) -> int:
+    count = 0
+    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) != 5:
+            raise ValueError(f"{path.name}:{line_number} 不是 YOLO 5 字段格式")
+        class_id = int(float(parts[0]))
+        values = [float(value) for value in parts[1:]]
+        if class_id != 0:
+            raise ValueError(f"{path.name}:{line_number} 类别必须为 0")
+        x, y, width, height = values
+        if not (0 <= x <= 1 and 0 <= y <= 1 and 0 < width <= 1 and 0 < height <= 1):
+            raise ValueError(f"{path.name}:{line_number} 坐标超出 YOLO 范围")
+        count += 1
+    return count
+
+
+def sync_labelimg_annotations(
+    workspace: str | Path, accept_unlabeled_negative: bool = False
+) -> LabelImgSyncResult:
+    workspace = Path(workspace).resolve()
+    manifest = workspace / "manifest.csv"
+    rows = _read_manifest(manifest)
+    labelimg_root = workspace / "labelimg"
+    label_dir = labelimg_root / "labels"
+    baseline_path = labelimg_root / "baseline.json"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path.exists() else {}
+    canonical_labels = workspace / "labels"
+    canonical_labels.mkdir(parents=True, exist_ok=True)
+    updated = 0
+
+    for row in rows:
+        candidate_id = row["candidate_id"]
+        source_label = label_dir / f"{candidate_id}.txt"
+        current_state = _label_state(source_label)
+        previous_state = baseline.get(candidate_id)
+        canonical_label = canonical_labels / f"{candidate_id}.txt"
+        canonical_state = _label_state(canonical_label)
+        changed = current_state is not None and (
+            current_state != previous_state or current_state.get("sha256") != (canonical_state or {}).get("sha256")
+        )
+        already_reviewed = row.get("status") in REVIEWED_STATUSES
+        if source_label.exists() and (changed or already_reviewed):
+            box_count = _validate_labelimg_yolo(source_label)
+            shutil.copy2(source_label, canonical_label)
+            row["status"] = "positive" if box_count else "negative"
+            row["box_count"] = str(box_count)
+            updated += int(changed)
+        elif accept_unlabeled_negative and not already_reviewed:
+            negative_label = canonical_labels / f"{candidate_id}.txt"
+            negative_label.write_text("", encoding="utf-8")
+            row["status"] = "negative"
+            row["box_count"] = "0"
+            updated += 1
+
+    _write_manifest(manifest, rows)
+    status = annotation_status(workspace)
+    statuses = status["statuses"]
+    return LabelImgSyncResult(
+        positive=int(statuses.get("positive", 0)),
+        negative=int(statuses.get("negative", 0)),
+        pending=int(status["total"]) - int(statuses.get("positive", 0)) - int(statuses.get("negative", 0)),
+        updated=updated,
+    )
+
+
+def run_labelimg(workspace: str | Path) -> LabelImgSyncResult:
+    workspace_result = prepare_labelimg_workspace(workspace)
+    launcher = Path(__file__).resolve().parents[1] / "labelimg_app.py"
+    command = [
+        sys.executable,
+        str(launcher),
+        str(workspace_result.image_dir),
+        str(workspace_result.class_file),
+        str(workspace_result.label_dir),
+    ]
+    print("启动 LabelImg:", " ".join(command))
+    subprocess.run(command, check=True)
+    return sync_labelimg_annotations(workspace)
 
 
 def _sha256(path: Path) -> str:

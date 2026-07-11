@@ -450,13 +450,13 @@ def run_exp09(args: argparse.Namespace, output_dir: Path) -> None:
     if args.dry_run:
         print(f"dry-run: 未写入 Demo 检查清单: {checklist}")
         if args.launch_gui:
-            run_command([sys.executable, "app.py"], dry_run=True)
+            run_command([sys.executable, "app.py", "--weights", args.weights], dry_run=True)
         return
     checklist.parent.mkdir(parents=True, exist_ok=True)
     checklist.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"Demo 检查清单已保存: {checklist}")
     if args.launch_gui:
-        run_command([sys.executable, "app.py"], dry_run=args.dry_run)
+        run_command([sys.executable, "app.py", "--weights", args.weights], dry_run=args.dry_run)
 
 
 def run_experiment(exp_id: str, args: argparse.Namespace, output_dir: Path) -> None:

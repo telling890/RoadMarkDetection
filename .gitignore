@@ -33,3 +33,5 @@ runs/
 
 # Local upload worktree
 .upload-worktree/
+.github-sync-worktree/
+.github-sync.lock

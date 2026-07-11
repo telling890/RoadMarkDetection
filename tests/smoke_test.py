@@ -26,7 +26,9 @@ from roadmark_experiments.annotation import (  # noqa: E402
     annotation_status,
     export_reviewed_dataset,
     ingest_collected_images,
+    prepare_labelimg_workspace,
     select_annotation_candidates,
+    sync_labelimg_annotations,
 )
 from roadmark_experiments.data_selection import SelectionOptions, prepare_dataset_from_raw  # noqa: E402
 from roadmark_experiments.dataset_audit import audit_dataset  # noqa: E402
@@ -160,6 +162,16 @@ def main() -> None:
         with selection.manifest.open("r", encoding="utf-8-sig", newline="") as handle:
             annotation_rows = list(csv.DictReader(handle))
         assert len(annotation_rows) == 4
+
+        labelimg_workspace = prepare_labelimg_workspace(annotation_workspace)
+        assert labelimg_workspace.images == 4
+        assert labelimg_workspace.class_file.read_text(encoding="utf-8") == "road_mark_missing\n"
+        first_label = labelimg_workspace.label_dir / f"{annotation_rows[0]['candidate_id']}.txt"
+        second_label = labelimg_workspace.label_dir / f"{annotation_rows[1]['candidate_id']}.txt"
+        first_label.write_text("0 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+        second_label.write_text("", encoding="utf-8")
+        synced = sync_labelimg_annotations(annotation_workspace)
+        assert synced.positive == 1 and synced.negative == 1 and synced.pending == 2
 
         collected = root / "collected_batch"
         collected.mkdir()

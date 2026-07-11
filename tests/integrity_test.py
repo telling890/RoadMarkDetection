@@ -31,16 +31,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="检查路面标线缺失实验的完整运行链路")
     parser.add_argument("--require-gpu", action="store_true", help="没有 CUDA 时直接失败")
     parser.add_argument("--img-size", type=int, default=320)
+    parser.add_argument("--data", default="data/road_mark.yaml", help="要检查的数据集 YAML")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    data = load_dataset_config(ROOT / "data" / "road_mark.yaml")
+    data_path = Path(args.data)
+    data_path = data_path if data_path.is_absolute() else ROOT / data_path
+    data = load_dataset_config(data_path)
     train_count = len(iter_images(data.train))
     val_count = len(iter_images(data.val))
     assert train_count > 0 and val_count > 0, "train/val 数据集不能为空"
-    assert data.names == ROADMARK_MISSING_CLASSES, "数据 YAML 类别协议与代码不一致"
+    supported_protocols = (ROADMARK_MISSING_CLASSES, ["road_mark_missing"])
+    assert data.names in supported_protocols, "数据 YAML 必须使用单类正式协议或旧版 10 类兼容协议"
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     if args.require_gpu and device == "cpu":
@@ -50,7 +54,7 @@ def main() -> None:
     model_rows: list[str] = []
     for model_yaml in MODEL_YAMLS:
         payload = yaml.safe_load(model_yaml.read_text(encoding="utf-8")) or {}
-        assert int(payload.get("nc", -1)) == len(data.names), f"{model_yaml.name} 的 nc 与数据集不一致"
+        assert int(payload.get("nc", -1)) == len(ROADMARK_MISSING_CLASSES), f"{model_yaml.name} 的基础类别数异常"
         yolo = YOLO(str(model_yaml))
         model = yolo.model.to(device).eval()
         sample = torch.zeros(1, 3, args.img_size, args.img_size, device=device)
@@ -71,7 +75,7 @@ def main() -> None:
     assert profile.img_size >= 768 and profile.cos_lr and profile.multi_scale > 0
 
     print(f"device: {device}")
-    print(f"dataset: train={train_count}, val={val_count}, classes={len(data.names)}")
+    print(f"dataset: {data.yaml_path} | train={train_count}, val={val_count}, classes={len(data.names)}")
     for row in model_rows:
         print(row)
     warning = semantic_warning(data.yaml_path)

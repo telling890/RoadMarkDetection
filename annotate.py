@@ -10,7 +10,9 @@ from roadmark_experiments.annotation import (
     export_reviewed_dataset,
     ingest_collected_images,
     prelabel_candidates,
+    run_labelimg,
     select_annotation_candidates,
+    sync_labelimg_annotations,
 )
 
 
@@ -36,9 +38,20 @@ def parse_args() -> argparse.Namespace:
     ingest.add_argument("--min-width", type=int, default=640)
     ingest.add_argument("--min-height", type=int, default=480)
 
-    review = subparsers.add_parser("review", help="打开鼠标框选工具")
+    review = subparsers.add_parser("review", help="打开 LabelImg，并在关闭后同步 YOLO 标签")
     review.add_argument("--workspace", default="annotations/road_mark_missing")
-    review.add_argument("--start", type=int, default=0)
+
+    native_review = subparsers.add_parser("review-native", help="打开原生轻量标注工具作为备用")
+    native_review.add_argument("--workspace", default="annotations/road_mark_missing")
+    native_review.add_argument("--start", type=int, default=0)
+
+    sync = subparsers.add_parser("labelimg-sync", help="同步 LabelImg 标签到标注清单")
+    sync.add_argument("--workspace", default="annotations/road_mark_missing")
+    sync.add_argument(
+        "--accept-unlabeled-negative",
+        action="store_true",
+        help="确认所有图片已逐张查看后，将仍无标签文件的图片标为负样本",
+    )
 
     prelabel = subparsers.add_parser("prelabel", help="使用已有单类模型为待标图片生成预标注")
     prelabel.add_argument("--workspace", default="annotations/road_mark_missing")
@@ -74,7 +87,13 @@ def main() -> None:
         print(f"候选清单: {result.manifest}")
         print(f"候选图片: {result.candidates}，高标线得分: {result.high_score_candidates}，随机负样本池: {result.random_candidates}")
     elif args.command == "review":
+        result = run_labelimg(args.workspace)
+        print(f"LabelImg 同步完成: positive={result.positive}, negative={result.negative}, pending={result.pending}, updated={result.updated}")
+    elif args.command == "review-native":
         AnnotationSession(args.workspace, start=args.start).run()
+    elif args.command == "labelimg-sync":
+        result = sync_labelimg_annotations(args.workspace, args.accept_unlabeled_negative)
+        print(f"LabelImg 同步完成: positive={result.positive}, negative={result.negative}, pending={result.pending}, updated={result.updated}")
     elif args.command == "ingest":
         result = ingest_collected_images(
             source_root=args.source,
