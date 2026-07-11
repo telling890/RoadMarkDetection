@@ -5,6 +5,7 @@ param(
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
 $syncScript = Join-Path $PSScriptRoot "sync_github.ps1"
+$lockFile = Join-Path $root ".github-sync.lock"
 $excludedPattern = "[\\/](\.git|\.idea|\.github-sync-worktree|\.upload-worktree|__pycache__|dataset|runs|annotations|new data1)[\\/]"
 $watcher = [IO.FileSystemWatcher]::new($root)
 $watcher.IncludeSubdirectories = $true
@@ -19,7 +20,7 @@ try {
         $change = $watcher.WaitForChanged([IO.WatcherChangeTypes]::All, 2000)
         if (-not $change.TimedOut) {
             $fullPath = Join-Path $root $change.Name
-            if ($fullPath -notmatch $excludedPattern -and $fullPath -notlike "*.pyc" -and $fullPath -notlike "*.cache") {
+            if ($fullPath -ne $lockFile -and $fullPath -notmatch $excludedPattern -and $fullPath -notlike "*.pyc" -and $fullPath -notlike "*.cache") {
                 $pending = $true
                 $lastChange = Get-Date
             }

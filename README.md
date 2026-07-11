@@ -622,3 +622,19 @@ python experiment.py --exp all --device 0 --profile accuracy --dry-run
 ```
 
 `smoke_test.py` 检查模块、数据审计和 zip 导入逻辑；`integrity_test.py` 使用 CUDA 对三个自定义模型执行真实前向，并检查类别数、Wise-IoU 注入和精度配置。正式训练前两项都必须通过。
+
+## 12. GitHub 自动同步
+
+项目已启用源码自动同步。源码或文档停止变化 30 秒后，本机监听器会运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools\sync_github.ps1
+```
+
+同步流程会创建干净临时 worktree，排除 `dataset/`、`new data1/`、`annotations/`、`runs/`、模型权重和缓存，然后执行 Python 编译检查与 `tests/smoke_test.py`。只有测试通过才会创建提交并非强制推送到 GitHub `main`。
+
+Codex 中另有每 15 分钟执行一次的补偿同步任务，防止本机监听器因重启中断。需要手动启动监听器时运行：
+
+```powershell
+Start-Process powershell.exe -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','tools\watch_github_sync.ps1' -WindowStyle Hidden
+```
