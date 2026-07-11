@@ -1,0 +1,18 @@
+target_task: road_mark_missing_detection
+source_task: road_damage_detection
+verified_for_target_task: false
+message: >-
+  Current labels originated from D00-D90 road-damage annotations. Renaming class
+  labels does not verify road-mark missing semantics. Manually relabel or verify
+  the dataset before reporting road-mark missing detection accuracy.
+source_classes:
+  - D00
+  - D10
+  - D20
+  - D30
+  - D40
+  - D50
+  - D60
+  - D70
+  - D80
+  - D90

@@ -1,0 +1,15 @@
+path: ../dataset
+train: images/train
+val: images/val
+nc: 10
+names:
+- lane_line_missing
+- lane_line_break
+- edge_line_missing
+- stop_line_missing
+- crosswalk_missing
+- arrow_missing
+- guide_line_missing
+- worn_marking_missing
+- occluded_marking_missing
+- other_marking_missing

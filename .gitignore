@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local datasets and generated artifacts
+dataset/
+runs/
+*.cache
+*.zip
+*.rar
+*.7z
+
+# Model weights and exported models
+*.pt
+*.pth
+*.onnx
+*.engine
+*.torchscript
+
+# Local upload worktree
+.upload-worktree/
